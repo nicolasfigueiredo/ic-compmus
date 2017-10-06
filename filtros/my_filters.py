@@ -101,3 +101,27 @@ def my_filter3(y, sr):
     
     y_rec = librosa.istft(Y_rec, hop_length=512)
     return y_rec
+
+def my_filter3_adaptive(y, sr, percentile):
+    
+    Y = librosa.stft(y, n_fft = 4096, hop_length = 512)
+    Y_dB = librosa.amplitude_to_db(Y, ref=np.max)
+       
+    var_trust = var_trust_func(Y_dB)
+    contrast = contrast_trust_func(np.abs(Y), sr)
+    
+    threshold_var = np.percentile(var_trust, percentile)
+    threshold_contrast = np.percentile(contrast, percentile)
+    
+    mask = np.zeros(var_trust.shape)
+    mask[np.logical_and(var_trust > threshold_var, contrast > threshold_contrast)] = 1
+    mask = scipy.ndimage.morphology.binary_dilation(mask, struct)
+
+    
+    mag, phase = librosa.magphase(Y)
+    newmag = np.multiply(mag, mask)
+    Y_rec = np.multiply(newmag, np.exp(np.multiply(phase, (1j))))
+    
+    y_rec = librosa.istft(Y_rec, hop_length=512)
+   
+    return y_rec, Y_rec
