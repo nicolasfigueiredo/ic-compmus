@@ -1,5 +1,8 @@
 import librosa
 import numpy as np
+import scipy.ndimage.morphology
+
+struct = np.ones((7,7))
 
 # Retorna a máscara relativa à variância
 def var_trust_func(Y, numFrames=200):
@@ -15,7 +18,7 @@ def var_trust_func(Y, numFrames=200):
         var_p = var_p.reshape(var_p.shape[0],1)   
         var_trust[:,indice_start:indice_stop] = var_p
         
-    var_trust = var_trust / np.max(var_trust)
+    var_trust = (var_trust - np.min(var_trust)) / (np.max(var_trust) - np.min(var_trust))
     return(var_trust)
 
 # Expande a matriz de contraste para as mesmas dimensões da matriz espectral
@@ -39,7 +42,7 @@ def contrast_trust_func(Y, sr):
     contrast_p = librosa.feature.spectral_contrast(S=Y, sr=sr, linear=True, n_bands=n_bands, fmin=64)
     deltaF = int(round(64/(sr/(2*Y.shape[0]))))
     contrast = expand_contrast(contrast_p, Y.shape, n_bands, deltaF)
-    contrast /= np.max(contrast)
+    contrast = (contrast - np.min(contrast)) / (np.max(contrast) - np.min(contrast))
     return(contrast)
 
 # Filtro 1: máscara de filtragem = máscara da variância .* máscara do contraste
@@ -51,14 +54,14 @@ def my_filter(y, sr):
     contrast = contrast_trust_func(np.abs(Y), sr)
     
     mask = np.multiply(contrast, var_trust)
-    mask = mask / np.max(mask)    
+    mask = (mask - np.min(mask)) / (np.max(mask) - np.min(mask))    
     
     mag, phase = librosa.magphase(Y)
     newmag = np.multiply(mag, mask)
     Y_rec = np.multiply(newmag, np.exp(np.multiply(phase, (1j))))
     y_rec = librosa.istft(Y_rec, hop_length=512)
 
-    return y_rec
+    return y_rec, Y_rec
 
 # Filtro 2: filtragem prévia com máscara da variância, depois computação e filtragem da máscara de contraste
 def my_filter2(y, sr):
@@ -81,7 +84,7 @@ def my_filter2(y, sr):
     newnewmag = np.multiply(newmag, mask)
     Y_rec = np.multiply(newnewmag, np.exp(np.multiply(phase, (1j))))
     y_rec = librosa.istft(Y_rec, hop_length=512)
-    return y_rec
+    return y_rec, Y_rec
 
 # Filtro 3: filtro binário
 def my_filter3(y, sr):
@@ -100,7 +103,7 @@ def my_filter3(y, sr):
     Y_rec = np.multiply(newmag, np.exp(np.multiply(phase, (1j))))
     
     y_rec = librosa.istft(Y_rec, hop_length=512)
-    return y_rec
+    return y_rec, Y_rec
 
 def my_filter3_adaptive(y, sr, percentile):
     

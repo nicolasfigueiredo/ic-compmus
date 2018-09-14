@@ -1,0 +1,2 @@
+file 'original.wav'
+file 'filtrado.wav'
